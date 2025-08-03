@@ -3,6 +3,7 @@
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
+#include "GameFramework/Character.h"
 
 APDPlayerController::APDPlayerController()
 {
@@ -25,6 +26,8 @@ void APDPlayerController::SetupInputComponent()
 	{
 		EnhancedInputComponent->BindAction(MoveAction, ETriggerEvent::Triggered, this, &APDPlayerController::Move);
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &APDPlayerController::Look);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &APDPlayerController::OnJumpStarted);
+		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &APDPlayerController::OnJumpCompleted);
 	}
 	else
 	{
@@ -67,4 +70,26 @@ void APDPlayerController::Look(const FInputActionValue& Value)
 
 	AddYawInput(LookAxisVector.X);
 	AddPitchInput(-LookAxisVector.Y);
+}
+
+void APDPlayerController::OnJumpStarted(const FInputActionValue& Value)
+{
+	APawn* ControlledPawn = GetPawn();
+	if (!IsValid(ControlledPawn)) return;
+
+	ACharacter* PlayerCharacter = Cast<ACharacter>(ControlledPawn);
+	if (!IsValid(PlayerCharacter)) return;
+
+	PlayerCharacter->Jump();
+}
+
+void APDPlayerController::OnJumpCompleted(const FInputActionValue& Value)
+{
+	APawn* ControlledPawn = GetPawn();
+	if (!IsValid(ControlledPawn)) return;
+
+	ACharacter* PlayerCharacter = Cast<ACharacter>(ControlledPawn);
+	if (!IsValid(PlayerCharacter)) return;
+
+	PlayerCharacter->StopJumping();
 }
