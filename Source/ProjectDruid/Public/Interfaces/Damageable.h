@@ -18,5 +18,6 @@ class PROJECTDRUID_API IDamageable
 	GENERATED_BODY()
 
 public:
+	UFUNCTION()
 	virtual void TakeDamage(AActor* DamageCauser, float DamageAmount) = 0;
 };
