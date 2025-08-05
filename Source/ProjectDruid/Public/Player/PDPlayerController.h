@@ -27,6 +27,7 @@ protected:
 	void Look(const FInputActionValue& Value);
 	void OnJumpStarted(const FInputActionValue& Value);
 	void OnJumpCompleted(const FInputActionValue& Value);
+	void Torch(const FInputActionValue& Value);
 
 protected:
 	/** Input Actions and Mapping Contexts */
@@ -38,6 +39,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	TObjectPtr<UInputAction> JumpAction;
+
+	UPROPERTY(editAnywhere, BlueprintReadWrite, Category = "Input")
+	TObjectPtr<UInputAction> TorchAction;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input", meta = (AllowPrivateAccess = "true"))
 	TArray<UInputMappingContext*> DefaultMappingContexts;

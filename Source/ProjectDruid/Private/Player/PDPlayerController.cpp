@@ -4,6 +4,7 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "GameFramework/Character.h"
+#include "Player/PDPlayerCharacter.h"
 
 APDPlayerController::APDPlayerController()
 {
@@ -28,6 +29,7 @@ void APDPlayerController::SetupInputComponent()
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &APDPlayerController::Look);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &APDPlayerController::OnJumpStarted);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &APDPlayerController::OnJumpCompleted);
+		EnhancedInputComponent->BindAction(TorchAction, ETriggerEvent::Triggered, this, &APDPlayerController::Torch);
 	}
 	else
 	{
@@ -92,4 +94,14 @@ void APDPlayerController::OnJumpCompleted(const FInputActionValue& Value)
 	if (!IsValid(PlayerCharacter)) return;
 
 	PlayerCharacter->StopJumping();
+}
+
+void APDPlayerController::Torch(const FInputActionValue& Value)
+{
+	APawn* ControlledPawn = GetPawn();
+	if (!IsValid(ControlledPawn)) return;
+
+	APDPlayerCharacter* PlayerCharacter = Cast<APDPlayerCharacter>(ControlledPawn);
+	if (!IsValid(PlayerCharacter)) return;
+	PlayerCharacter->TryActivateTorch();
 }
