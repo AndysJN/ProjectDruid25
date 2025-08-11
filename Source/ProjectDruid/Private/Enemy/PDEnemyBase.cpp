@@ -1,160 +1,48 @@
 ﻿#include "Enemy/PDEnemyBase.h"
 
-#include "Components/SphereComponent.h"
 #include "Player/PDPlayerCharacter.h"
+#include "AIController.h"
+#include "BehaviorTree/BlackboardComponent.h"
 #include "Kismet/GameplayStatics.h"
-#include "Enemy/PDEnemyAIController.h"
-#include "GameFramework/CharacterMovementComponent.h"
-
-constexpr float MoveTickInterval = 0.02f;
+#include "GameFramework/Character.h"
 
 APDEnemyBase::APDEnemyBase()
 {
 	PrimaryActorTick.bCanEverTick = false;
-
-	GetCharacterMovement()->bOrientRotationToMovement = false;
-	bUseControllerRotationYaw = true;
-
-	AttackSphere = CreateDefaultSubobject<USphereComponent>(TEXT("AttackSphere"));
-	AttackSphere->SetSphereRadius(AttackRange);
-	AttackSphere->SetupAttachment(GetRootComponent());
-	AttackSphere->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
-
-	ChaseSphere = CreateDefaultSubobject<USphereComponent>(TEXT("ChaseSphere"));
-	ChaseSphere->SetSphereRadius(ChaseRange);
-	ChaseSphere->SetupAttachment(GetRootComponent());
-	ChaseSphere->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
 }
 
 void APDEnemyBase::BeginPlay()
 {
 	Super::BeginPlay();
-
-	AttackSphere->OnComponentBeginOverlap.AddDynamic(this, &APDEnemyBase::OnAttackSphereOverlap);
-	AttackSphere->OnComponentEndOverlap.AddDynamic(this, &APDEnemyBase::OnAttackSphereEndOverlap);
-	ChaseSphere->OnComponentBeginOverlap.AddDynamic(this, &APDEnemyBase::OnChaseSphereOverlap);
-	ChaseSphere->OnComponentEndOverlap.AddDynamic(this, &APDEnemyBase::OnChaseSphereEndOverlap);
 }
 
-void APDEnemyBase::TakeDamage(AActor* DamageCauser, float DamageAmount)
+bool APDEnemyBase::IsPlayerInAttackRange() const
 {
-	// Enemy will not take damage. Might give it an empty body in the interface later to avoid having to implement this function here.
+	// Get player character
+	ACharacter* PlayerCharacter = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
+	if (!IsValid(PlayerCharacter)) return false;
+
+	// Calculate distance
+	float Distance = FVector::Dist(GetActorLocation(), PlayerCharacter->GetActorLocation());
+
+	// Check if player is within attack range
+	return Distance <= AttackRange;
 }
 
-void APDEnemyBase::TryAttackPlayer(APDPlayerCharacter* Player)
+void APDEnemyBase::ApplyDamageToPlayer()
 {
+	// Get AI controller and blackboard
+	AAIController* AIController = Cast<AAIController>(GetController());
+	if (!IsValid(AIController)) return;
+
+	UBlackboardComponent* Blackboard = AIController->GetBlackboardComponent();
+	if (!IsValid(Blackboard)) return;
+
+	// Get target from blackboard
+	APDPlayerCharacter* Player = Cast<APDPlayerCharacter>(Blackboard->GetValueAsObject("AttackTarget"));
 	if (!IsValid(Player)) return;
 
-	StopChasing();
 	Player->TakeDamage(this, Damage);
-	UE_LOG(LogTemp, Warning, TEXT("Attacking player! Damage: %f"), Damage);
-}
 
-void APDEnemyBase::MoveTowardsPlayer()
-{
-	auto* Player = Cast<APDPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
-	if (!IsValid(Player) || !Player->IsTorchActive())
-	{
-		StopChasing();
-		return;
-	}
-
-	auto* AIController = Cast<APDEnemyAIController>(GetController());
-	if (IsValid(AIController))
-	{
-		AIController->MoveToPlayer(Player);
-	}
-}
-
-void APDEnemyBase::StopChasing()
-{
-	if (!bIsChasingPlayer) return;
-
-	bIsChasingPlayer = false;
-	GetWorldTimerManager().ClearTimer(MoveTimerHandle);
-
-	auto* AIController = Cast<APDEnemyAIController>(GetController());
-	if (IsValid(AIController))
-	{
-		AIController->StopMovement();
-	}
-}
-
-void APDEnemyBase::StartChasing()
-{
-	if (bIsChasingPlayer) return;
-
-	bIsChasingPlayer = true;
-	GetWorldTimerManager().SetTimer(MoveTimerHandle, this, &APDEnemyBase::MoveTowardsPlayer, MoveTickInterval, true);
-}
-
-void APDEnemyBase::OnAttackSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-                                         UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
-                                         const FHitResult& SweepResult)
-{
-	auto* Player = Cast<APDPlayerCharacter>(OtherActor);
-	if (!IsValid(Player)) return;
-
-	if (!GetWorldTimerManager().IsTimerActive(AttackTimerHandle))
-	{
-		GetWorldTimerManager().SetTimer(AttackTimerHandle, [this, Player]()
-		{
-			TryAttackPlayer(Player);
-		}, AttackInterval, true);
-	}
-}
-
-void APDEnemyBase::OnAttackSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-                                            UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
-{
-	auto* Player = Cast<APDPlayerCharacter>(OtherActor);
-	if (!IsValid(Player)) return;
-
-	GetWorldTimerManager().ClearTimer(AttackTimerHandle);
-
-	if (ChaseSphere && ChaseSphere->IsOverlappingActor(Player) && Player->IsTorchActive())
-	{
-		StartChasing();
-	}
-}
-
-void APDEnemyBase::OnChaseSphereOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-                                        UPrimitiveComponent* OtherComp, int32 OtherBodyIndex, bool bFromSweep,
-                                        const FHitResult& SweepResult)
-{
-	auto* Player = Cast<APDPlayerCharacter>(OtherActor);
-	if (IsValid(Player) && Player->IsTorchActive())
-	{
-		StartChasing();
-	}
-}
-
-void APDEnemyBase::OnChaseSphereEndOverlap(UPrimitiveComponent* OverlappedComponent, AActor* OtherActor,
-                                           UPrimitiveComponent* OtherComp, int32 OtherBodyIndex)
-{
-	auto* Player = Cast<APDPlayerCharacter>(OtherActor);
-	if (IsValid(Player))
-	{
-		StopChasing();
-	}
-}
-
-void APDEnemyBase::OnTorchStateChanged(bool bActive, APDPlayerCharacter* SourcePlayer)
-{
-	if (!bActive)
-	{
-		StopChasing();
-		return;
-	}
-
-	APDPlayerCharacter* Player = SourcePlayer;
-	if (!Player)
-	{
-		Player = Cast<APDPlayerCharacter>(UGameplayStatics::GetPlayerPawn(this, 0));
-	}
-
-	if (IsValid(Player) && Player->IsTorchActive() && ChaseSphere && ChaseSphere->IsOverlappingActor(Player))
-	{
-		StartChasing();
-	}
+	UE_LOG(LogTemp, Warning, TEXT("Enemy attacked player! Damage: %f"), Damage);
 }
