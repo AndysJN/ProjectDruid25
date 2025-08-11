@@ -2,12 +2,12 @@
 
 APDEnemyAIController::APDEnemyAIController()
 {
-	PrimaryActorTick.bCanEverTick = false;
+	PrimaryActorTick.bCanEverTick = true;
 }
 
 void APDEnemyAIController::MoveToPlayer(AActor* Player)
 {
-	if (!Player) return;
+	/*if (!Player) return;
 
 	APawn* ControlledPawn = GetPawn();
 	if (!ControlledPawn) return;
@@ -19,7 +19,7 @@ void APDEnemyAIController::MoveToPlayer(AActor* Player)
 	FRotator TargetRotation = Direction.Rotation();
 	ControlledPawn->SetActorRotation(TargetRotation);
 
-	MoveToActor(Player, 5.0f);
+	MoveToActor(Player, 5.0f);*/
 }
 
 void APDEnemyAIController::BeginPlay()
