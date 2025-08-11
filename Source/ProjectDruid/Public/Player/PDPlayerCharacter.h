@@ -4,6 +4,7 @@
 #include "PDCharacterBase.h"
 #include "Interfaces/Damageable.h"
 #include "Interfaces/TorchAbility.h"
+#include "Sound/SoundBase.h"
 #include "PDPlayerCharacter.generated.h"
 
 class UCameraComponent;
@@ -18,10 +19,9 @@ class PROJECTDRUID_API APDPlayerCharacter : public APDCharacterBase, public IDam
 
 public:
 	APDPlayerCharacter();
-
+	
 	virtual void TakeDamage(AActor* DamageCauser, float DamageAmount) override;
-
-	// ITorchAbility interface
+	
 	virtual bool IsTorchActive() const override;
 	virtual float GetTorchRadius() const override;
 	virtual void OnTorchStateChanged(bool bActive, APDPlayerCharacter* SourcePlayer = nullptr) override;
@@ -29,15 +29,30 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Torch")
 	void SetTorchAbilityEnabled(bool bEnabled);
 
+	UFUNCTION(BlueprintCallable, Category = "Torch")
+	void TryActivateTorch();
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	TObjectPtr<UCameraComponent> PDCameraComponent;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
+	TObjectPtr<USpringArmComponent> PDSpringArmComponent;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
+	float Health = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
+	float MaxHealth = 100.0f;
+
 protected:
 	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	void ActivateTorch();
 	void DeactivateTorch();
 	void OnTorchCooldownFinished();
 	void ConsumeTorchFuel();
 
-	/** Torch Ability */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Torch")
 	bool bTorchActive = false;
 
@@ -59,35 +74,44 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Torch")
 	float TorchFuelConsumptionRate = 1.0f;
 
+	UPROPERTY(EditAnywhere, Category = "Torch Visuals")
+	float TorchFlickerIntensity = 0.05f;
+
+	UPROPERTY(EditAnywhere, Category = "Torch Visuals")
+	float TorchFlickerSpeed = 8.0f;
+
+	UPROPERTY(EditAnywhere, Category = "Torch Visuals")
+	bool bTorchRespondsToMovement = true;
+
+	// Audio properties for torch activation/deactivation
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Torch Audio")
+	TObjectPtr<USoundBase> TorchActivationSound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Torch Audio")
+	TObjectPtr<USoundBase> TorchDeactivationSound;
+	
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Torch Audio")
+	TObjectPtr<USoundBase> TorchReadySound;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Torch Audio")
+	float TorchSoundVolume = 1.0f;
+
 	FTimerHandle TorchActiveTimerHandle;
 	FTimerHandle TorchCooldownTimerHandle;
 	FTimerHandle TorchFuelTimerHandle;
 
-public:
-	/** Components */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
-	TObjectPtr<UCameraComponent> PDCameraComponent;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Camera")
-	TObjectPtr<USpringArmComponent> PDSpringArmComponent;
-
-	/** Character Stats */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
-	float Health = 100.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Stats")
-	float MaxHealth = 100.0f;
-
-	UFUNCTION(BlueprintCallable, Category = "Torch")
-	void TryActivateTorch();
-
 private:
+	void UpdateTorchMaterialParams();
+	void StartTorchMaterialUpdate();
+	void StopTorchMaterialUpdate();
+	void UpdateTorchAbilityState();
+
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> TorchPPMaterialInstance = nullptr;
+
 	UPROPERTY()
 	TObjectPtr<APostProcessVolume> TorchPostProcessVolume = nullptr;
 
-	/** Torch Transition */
 	UPROPERTY(EditAnywhere, Category = "Torch Transition")
 	float CurrentTorchRadius = 0.0f;
 
@@ -98,9 +122,4 @@ private:
 	float TorchTransitionSpeed = 4.0f;
 
 	FTimerHandle TorchMaterialUpdateTimerHandle;
-	void UpdateTorchMaterialParams();
-	void StartTorchMaterialUpdate();
-	void StopTorchMaterialUpdate();
-	void UpdateTorchAbilityState();
-	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 };

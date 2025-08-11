@@ -9,6 +9,7 @@
 #include "Engine/PostProcessVolume.h"
 #include "Engine/World.h"
 #include "Engine/Engine.h"
+#include "Components/MeshComponent.h"
 
 
 APDPlayerCharacter::APDPlayerCharacter()
@@ -176,24 +177,73 @@ void APDPlayerCharacter::UpdateTorchMaterialParams()
 		return;
 	}
 
-	// Set target radius based on torch state
-	TargetTorchRadius = bTorchActive ? TorchRadius : 0.0f;
-
-	// Interpolate current radius toward target
 	float DeltaTime = UGameplayStatics::GetWorldDeltaSeconds(this);
+
+	float FlickerMultiplier = 1.0f;
+	if (bTorchActive)
+	{
+		float Time = GetWorld()->GetTimeSeconds();
+		float Noise1 = FMath::Sin(Time * TorchFlickerSpeed) * 0.6f;
+		float Noise2 = FMath::Sin(Time * TorchFlickerSpeed * 2.7f) * 0.3f;
+		float Noise3 = FMath::Sin(Time * TorchFlickerSpeed * 5.3f) * 0.1f;
+		FlickerMultiplier = 1.0f + (Noise1 + Noise2 + Noise3) * TorchFlickerIntensity;
+
+		// Apply movement-based effects
+		if (bTorchRespondsToMovement)
+		{
+			float Speed = GetVelocity().Size();
+			float MovementFactor = FMath::Clamp(Speed / 600.0f, 0.0f, 1.0f);
+			// Increase flicker when moving
+			FlickerMultiplier += MovementFactor * 0.5f;
+		}
+
+		// Apply fuel-based visual effects
+		float FuelPercentage = FMath::Clamp(TorchFuel / 1000.0f, 0.0f, 1.0f);
+		// Torch flickers more intensely as fuel depletes
+		float LowFuelFlickerBoost = FMath::Lerp(1.8f, 1.0f, FuelPercentage);
+		FlickerMultiplier *= LowFuelFlickerBoost;
+	}
+
+	// Set target radius based on torch state and fuel level
+	if (bTorchActive)
+	{
+		float FuelPercentage = FMath::Clamp(TorchFuel / 1000.0f, 0.0f, 1.0f);
+		// Torch gets slightly smaller as fuel depletes
+		float BaseRadius = TorchRadius * (0.85f + (FuelPercentage * 0.15f));
+		TargetTorchRadius = BaseRadius;
+
+		// Apply movement effect on radius
+		if (bTorchRespondsToMovement)
+		{
+			float Speed = GetVelocity().Size();
+			float MovementFactor = FMath::Clamp(Speed / 600.0f, 0.0f, 1.0f);
+			TargetTorchRadius *= (1.0f - (MovementFactor * 0.15f));
+		}
+	}
+	else
+	{
+		TargetTorchRadius = 0.0f;
+	}
+	
 	CurrentTorchRadius = FMath::FInterpTo(CurrentTorchRadius, TargetTorchRadius, DeltaTime, TorchTransitionSpeed);
 
-	FVector2D ScreenPos;
 	APlayerController* PC = Cast<APlayerController>(GetController());
-	if (PC && UGameplayStatics::ProjectWorldToScreen(PC, GetActorLocation(), ScreenPos))
+	if (IsValid(PC))
 	{
-		FVector2D ViewportSize;
-		GEngine->GameViewport->GetViewportSize(ViewportSize);
-		FVector2D UV = FVector2D(ScreenPos.X / ViewportSize.X, ScreenPos.Y / ViewportSize.Y);
-		TorchPPMaterialInstance->SetVectorParameterValue(TEXT("PingCenter"), FLinearColor(UV.X, UV.Y, 0, 0));
+		FVector2D ScreenPos;
+		if (UGameplayStatics::ProjectWorldToScreen(PC, GetActorLocation(), ScreenPos))
+		{
+			FVector2D ViewportSize;
+			GEngine->GameViewport->GetViewportSize(ViewportSize);
+			FVector2D UV = FVector2D(ScreenPos.X / ViewportSize.X, ScreenPos.Y / ViewportSize.Y);
 
-		float NormalizedRadius = CurrentTorchRadius / (ViewportSize.X * 2.0f);
-		TorchPPMaterialInstance->SetScalarParameterValue(TEXT("PingRadius"), NormalizedRadius);
+			// Set torch position
+			TorchPPMaterialInstance->SetVectorParameterValue(TEXT("PingCenter"), FLinearColor(UV.X, UV.Y, 0, 0));
+
+			// Apply radius with flicker
+			float NormalizedRadius = (CurrentTorchRadius * FlickerMultiplier) / (ViewportSize.X * 2.0f);
+			TorchPPMaterialInstance->SetScalarParameterValue(TEXT("PingRadius"), NormalizedRadius);
+		}
 	}
 
 	// Check if we should stop updating when fading out is complete
@@ -215,19 +265,6 @@ void APDPlayerCharacter::OnTorchStateChanged(bool bActive, APDPlayerCharacter* S
 	if (bActive)
 	{
 		StartTorchMaterialUpdate();
-
-		for (TActorIterator<AActor> It(GetWorld()); It; ++It)
-		{
-			if (*It != this && It->Implements<UTorchAbility>())
-			{
-				ITorchAbility* TorchAbility = Cast<ITorchAbility>(*It);
-				if (TorchAbility)
-				{
-					// Pass this player as the source to let the enemy know
-					TorchAbility->OnTorchStateChanged(true, this);
-				}
-			}
-		}
 	}
 	else
 	{
@@ -259,6 +296,12 @@ void APDPlayerCharacter::ActivateTorch()
 {
 	bTorchActive = true;
 	OnTorchStateChanged(true);
+
+	if (TorchActivationSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, TorchActivationSound, GetActorLocation(), TorchSoundVolume);
+	}
+
 	GetWorldTimerManager().SetTimer(TorchActiveTimerHandle, this, &APDPlayerCharacter::DeactivateTorch, TorchActiveTime,
 	                                false);
 	GetWorldTimerManager().SetTimer(TorchFuelTimerHandle, this, &APDPlayerCharacter::ConsumeTorchFuel, 1.0f, true);
@@ -272,6 +315,12 @@ void APDPlayerCharacter::DeactivateTorch()
 	}
 	bTorchActive = false;
 	OnTorchStateChanged(false);
+
+	if (TorchDeactivationSound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, TorchDeactivationSound, GetActorLocation(), TorchSoundVolume);
+	}
+
 	GetWorldTimerManager().ClearTimer(TorchActiveTimerHandle);
 	GetWorldTimerManager().ClearTimer(TorchFuelTimerHandle);
 	GetWorldTimerManager().SetTimer(TorchCooldownTimerHandle, this, &APDPlayerCharacter::OnTorchCooldownFinished,
@@ -280,7 +329,10 @@ void APDPlayerCharacter::DeactivateTorch()
 
 void APDPlayerCharacter::OnTorchCooldownFinished()
 {
-	// Cooldown finished, torch can be activated again
+	if (TorchReadySound)
+	{
+		UGameplayStatics::PlaySoundAtLocation(this, TorchReadySound, GetActorLocation(), TorchSoundVolume);
+	}
 }
 
 void APDPlayerCharacter::ConsumeTorchFuel()

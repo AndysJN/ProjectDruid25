@@ -2,10 +2,10 @@
 
 #include "CoreMinimal.h"
 #include "Animation/AnimNotifies/AnimNotify.h"
-#include "AnimNotify_EnemyDamage.generated.h"
+#include "PDEnemyDamageNotify.generated.h"
 
 UCLASS()
-class PROJECTDRUID_API UAnimNotify_EnemyDamage : public UAnimNotify
+class PROJECTDRUID_API UPDEnemyDamageNotify : public UAnimNotify
 {
 	GENERATED_BODY()
 

@@ -1,7 +1,7 @@
-﻿#include "AnimNotifies/AnimNotify_EnemyDamage.h"
+﻿#include "AnimNotifies/PDEnemyDamageNotify.h"
 #include "Enemy/PDEnemyBase.h"
 
-void UAnimNotify_EnemyDamage::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation)
+void UPDEnemyDamageNotify::Notify(USkeletalMeshComponent* MeshComp, UAnimSequenceBase* Animation)
 {
 	if (!MeshComp)
 		return;
