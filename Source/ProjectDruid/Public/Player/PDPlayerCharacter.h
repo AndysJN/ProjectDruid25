@@ -72,6 +72,9 @@ protected:
 	float TorchFuel = 1000.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Torch")
+	float MaxTorchFuel = 1000.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Torch")
 	float TorchFuelConsumptionRate = 1.0f;
 
 	UPROPERTY(EditAnywhere, Category = "Torch Visuals")

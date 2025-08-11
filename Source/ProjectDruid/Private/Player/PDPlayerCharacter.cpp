@@ -198,7 +198,7 @@ void APDPlayerCharacter::UpdateTorchMaterialParams()
 		}
 
 		// Apply fuel-based visual effects
-		float FuelPercentage = FMath::Clamp(TorchFuel / 1000.0f, 0.0f, 1.0f);
+		float FuelPercentage = FMath::Clamp(TorchFuel / MaxTorchFuel, 0.0f, 1.0f);
 		// Torch flickers more intensely as fuel depletes
 		float LowFuelFlickerBoost = FMath::Lerp(1.8f, 1.0f, FuelPercentage);
 		FlickerMultiplier *= LowFuelFlickerBoost;
@@ -207,7 +207,7 @@ void APDPlayerCharacter::UpdateTorchMaterialParams()
 	// Set target radius based on torch state and fuel level
 	if (bTorchActive)
 	{
-		float FuelPercentage = FMath::Clamp(TorchFuel / 1000.0f, 0.0f, 1.0f);
+		float FuelPercentage = FMath::Clamp(TorchFuel / MaxTorchFuel, 0.0f, 1.0f);
 		// Torch gets slightly smaller as fuel depletes
 		float BaseRadius = TorchRadius * (0.85f + (FuelPercentage * 0.15f));
 		TargetTorchRadius = BaseRadius;
@@ -224,7 +224,7 @@ void APDPlayerCharacter::UpdateTorchMaterialParams()
 	{
 		TargetTorchRadius = 0.0f;
 	}
-	
+
 	CurrentTorchRadius = FMath::FInterpTo(CurrentTorchRadius, TargetTorchRadius, DeltaTime, TorchTransitionSpeed);
 
 	APlayerController* PC = Cast<APlayerController>(GetController());
@@ -338,9 +338,10 @@ void APDPlayerCharacter::OnTorchCooldownFinished()
 void APDPlayerCharacter::ConsumeTorchFuel()
 {
 	TorchFuel -= TorchFuelConsumptionRate;
+	TorchFuel = FMath::Clamp(TorchFuel, 0.0f, MaxTorchFuel);
+
 	if (TorchFuel <= 0.0f)
 	{
-		TorchFuel = 0.0f;
 		DeactivateTorch();
 	}
 }
